@@ -1,0 +1,1325 @@
+ESBUILD.JS
+
+const esbuild = require('esbuild');
+const fs = require('fs');
+const path = require('path');
+
+// Log current working directory and the path to package.json
+console.log('Current working directory:', process.cwd());
+console.log('Checking package.json at path:', path.resolve(__dirname, './package.json'));
+
+// Directly read package.json to verify its content
+fs.readFile(path.resolve(__dirname, './package.json'), 'utf8', (err, data) => {
+    if (err) {
+        console.error('Error reading package.json:', err);
+        return;
+    }
+    console.log('package.json content:', data);
+
+    try {
+        const jsonContent = JSON.parse(data);
+        console.log('Parsed package.json content:', jsonContent);
+    } catch (parseErr) {
+        console.error('Error parsing package.json:', parseErr);
+        return;
+    }
+
+    // Proceed with esbuild if package.json is valid
+    runEsbuild();
+});
+
+function runEsbuild() {
+    const production = process.argv.includes('--production');
+    const watch = process.argv.includes('--watch');
+
+    const esbuildProblemMatcherPlugin = {
+        name: 'esbuild-problem-matcher',
+        setup(build) {
+            build.onStart(() => {
+                console.log('[watch] build started');
+            });
+            build.onEnd((result) => {
+                result.errors.forEach(({ text, location }) => {
+                    console.error(`✘ [ERROR] ${text}`);
+                    console.error(`    ${location.file}:${location.line}:${location.column}:`);
+                });
+                console.log('[watch] build finished');
+            });
+        },
+    };
+
+    async function main() {
+        try {
+            const ctx = await esbuild.context({
+                entryPoints: ['./src/test/index.js'],
+                bundle: true,
+                format: 'cjs',
+                minify: production,
+                sourcemap: !production,
+                sourcesContent: false,
+                platform: 'node',
+                outfile: 'out.js',
+                external: ['vscode'],
+                logLevel: 'silent',
+                plugins: [esbuildProblemMatcherPlugin],
+            });
+            if (watch) {
+                await ctx.watch();
+            } else {
+                await ctx.rebuild();
+                await ctx.dispose();
+            }
+        } catch (error) {
+            console.error('Build failed with error:', error);
+            process.exit(1);
+        }
+    }
+
+    main().catch((e) => {
+        console.error(e);
+        process.exit(1);
+    });
+
+
+
+VSC-EXTENSION-QUICKSTART.MD
+
+# Welcome to your VS Code Extension
+
+## What's in the folder
+
+* This folder contains all of the files necessary for your extension.
+* `package.json` - this is the manifest file in which you declare your extension and command.
+  * The sample plugin registers a command and defines its title and command name. With this information VS Code can show the command in the command palette. It doesn’t yet need to load the plugin.
+* `src/extension.ts` - this is the main file where you will provide the implementation of your command.
+  * The file exports one function, `activate`, which is called the very first time your extension is activated (in this case by executing the command). Inside the `activate` function we call `registerCommand`.
+  * We pass the function containing the implementation of the command as the second parameter to `registerCommand`.
+
+## Setup
+
+* install the recommended extensions (amodio.tsl-problem-matcher, ms-vscode.extension-test-runner, and dbaeumer.vscode-eslint)
+
+
+## Get up and running straight away
+
+* Press `F5` to open a new window with your extension loaded.
+* Run your command from the command palette by pressing (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac) and typing `Hello World`.
+* Set breakpoints in your code inside `src/extension.ts` to debug your extension.
+* Find output from your extension in the debug console.
+
+## Make changes
+
+* You can relaunch the extension from the debug toolbar after changing code in `src/extension.ts`.
+* You can also reload (`Ctrl+R` or `Cmd+R` on Mac) the VS Code window with your extension to load your changes.
+
+
+## Explore the API
+
+* You can open the full set of our API when you open the file `node_modules/@types/vscode/index.d.ts`.
+
+## Run tests
+
+* Install the [Extension Test Runner](https://marketplace.visualstudio.com/items?itemName=ms-vscode.extension-test-runner)
+* Run the "watch" task via the **Tasks: Run Task** command. Make sure this is running, or tests might not be discovered.
+* Open the Testing view from the activity bar and click the Run Test" button, or use the hotkey `Ctrl/Cmd + ; A`
+* See the output of the test result in the Test Results view.
+* Make changes to `src/test/extension.test.ts` or create new test files inside the `test` folder.
+  * The provided test runner will only consider files matching the name pattern `**.test.ts`.
+  * You can create folders inside the `test` folder to structure your tests any way you want.
+
+## Go further
+
+* Reduce the extension size and improve the startup time by [bundling your extension](https://code.visualstudio.com/api/working-with-extensions/bundling-extension).
+* [Publish your extension](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) on the VS Code extension marketplace.
+* Automate builds by setting up [Continuous Integration](https://code.visualstudio.com/api/working-with-extensions/continuous-integration).
+
+
+
+PACKAGE.JSON
+
+{
+    "name": "con-svg-erter",
+    "displayName": "Con(sVg)erter",
+    "description": "simple .jpeg/.jpg/.png/.webp to svg converter.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [{
+            "command": "extension.convertImage",
+            "title": "Convert Image to SVG"
+        }],
+        "menus": {
+            "explorer/context": [{
+                "command": "extension.convertImage",
+                "when": "resourceLangId == jpg || resourceLangId == jpeg || resourceLangId == png || resourceLangId == webp",
+                "group": "navigation"
+            }]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "npm run check-types && npm run lint && node esbuild.js",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "node esbuild.js --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "package": "npm run check-types && npm run lint && node esbuild.js --production",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
+        "check-types": "tsc --noEmit",
+        "lint": "eslint src --ext ts",
+        "test": "vscode-test"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.6",
+        "@types/node": "20.x",
+        "@types/vscode": "^1.90.0",
+        "@typescript-eslint/eslint-plugin": "^7.11.0",
+        "@typescript-eslint/parser": "^7.11.0",
+        "@vscode/test-cli": "^0.0.9",
+        "@vscode/test-electron": "^2.4.0",
+        "esbuild": "^0.21.5",
+        "eslint": "^8.57.0",
+        "npm-run-all": "^4.1.5",
+        "typescript": "^5.4.5"
+    }
+
+
+
+TSCONFIG.JSON
+
+{
+	"compilerOptions": {
+		 "module": "Node16",
+		 "target": "ES2022",
+		 "lib": [
+			  "ES2022"
+		 ],
+		 "sourceMap": true,
+		 "rootDir": "src",
+		 "strict": true
+	}
+
+
+
+.GITIGNORE
+
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+
+
+
+.VSCODE-TEST.MJS
+
+import { defineConfig } from '@vscode/test-cli';
+
+export default defineConfig({
+	files: 'out/test/**/*.test.js',
+});
+
+
+
+README.MD
+
+# con-svg-erter README
+
+This is the README for your extension "con-svg-erter". After writing up a brief description, we recommend including the following sections.
+
+## Features
+
+Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+
+For example if there is an image subfolder under your extension project workspace:
+
+\!\[feature X\]\(images/feature-x.png\)
+
+> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+
+## Requirements
+
+If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+
+## Extension Settings
+
+Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+
+For example:
+
+This extension contributes the following settings:
+
+* `myExtension.enable`: Enable/disable this extension.
+* `myExtension.thing`: Set to `blah` to do something.
+
+## Known Issues
+
+Calling out known issues can help limit users opening duplicate issues against your extension.
+
+## Release Notes
+
+Users appreciate release notes as you update your extension.
+
+### 1.0.0
+
+Initial release of ...
+
+### 1.0.1
+
+Fixed issue #.
+
+### 1.1.0
+
+Added features X, Y, and Z.
+
+---
+
+## Following extension guidelines
+
+Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+
+* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+
+## Working with Markdown
+
+You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+
+* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
+* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
+* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+
+## For more information
+
+* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
+* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+
+**Enjoy!**
+
+
+
+IMAGE_TO_SVG.SH
+
+#!/bin/bash
+
+# Use Zenity to create a file selection dialog
+input_file=$(zenity --file-selection --title="Select an image file" --file-filter="Images | *.jpeg *.jpg *.png *.webp")
+
+# Check if the user selected a file or canceled the dialog
+if [ -z "$input_file" ]; then
+  zenity --error --text="No file selected."
+  exit 1
+fi
+
+# Check if the input file exists
+if [ ! -f "$input_file" ]; then
+  zenity --error --text="File not found!"
+  exit 1
+fi
+
+# Get the directory and filename without extension
+input_dir=$(dirname "$input_file")
+filename=$(basename -- "$input_file")
+filename="${filename%.*}"
+
+# Output file path
+output_file="${input_dir}/${filename}.svg"
+
+# Convert the input image to PGM format using ImageMagick
+pgm_file="${input_dir}/${filename}.pgm"
+if ! convert "$input_file" "$pgm_file"; then
+  zenity --error --text="Failed to convert $input_file to PGM format."
+  exit 1
+fi
+
+# Convert the PGM file to SVG using Potrace
+if ! potrace -s -o "$output_file" "$pgm_file"; then
+  zenity --error --text="Failed to convert $pgm_file to SVG format."
+  # Ensure the PGM file is deleted even if Potrace fails
+  rm "$pgm_file"
+  exit 1
+fi
+
+# Remove the temporary PGM file
+rm "$pgm_file"
+
+# Notify the user of the successful conversion
+zenity --info --text="Conversion complete: $output_file"
+
+
+
+INDEX.JS
+
+
+
+
+EXTENSION.TEST.TS
+
+import * as assert from 'assert';
+import * as vscode from 'vscode';
+// import * as myExtension from '../../extension';
+
+suite('Extension Test Suite', () => {
+	vscode.window.showInformationMessage('Start all tests.');
+
+	test('Sample test', () => {
+		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
+		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	});
+});
+
+
+
+EXTENSION.TS
+
+import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export function activate(context: vscode.ExtensionContext) {
+  let disposable = vscode.commands.registerCommand('extension.convertImage', async (uri: vscode.Uri) => {
+    if (!uri || !uri.fsPath) {
+      vscode.window.showErrorMessage('No image file selected.');
+      return;
+    }
+
+    const inputFile = uri.fsPath;
+
+    try {
+      const scriptPath = vscode.Uri.file('/home/rr-h/Documents/Scripts/image_to_svg.sh').fsPath;
+      const { stdout, stderr } = await execAsync(`bash "${scriptPath}" "${inputFile}"`);
+      if (stderr) {
+        throw new Error(stderr);
+      }
+
+      vscode.window.showInformationMessage(`Conversion complete: ${stdout.trim()}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        vscode.window.showErrorMessage(`Conversion failed: ${error.message}`);
+      } else {
+        vscode.window.showErrorMessage('Conversion failed: An unknown error occurred.');
+      }
+    }
+  });
+
+  context.subscriptions.push(disposable);
+}
+
+export function deactivate() {}
+
+
+
+SETTINGS.JSON
+
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        ".DS_Store": true,
+        ".env": true,
+        "*.xcodeproj/": true,
+        "*venv*": true,
+        "/.venv": true,
+        "/node_modules": true,
+        "node_modules": true,
+        "out": false,
+        "dist": false,
+        "**/node_modules": true
+    },
+    "search.exclude": {
+        "out": true,
+        "dist": false
+    },
+    "workbench.colorCustomizations": {
+        "activityBar.border": "#FA9E9E",
+        "tab.activeBorderTop": "#FA9E9E"
+    }
+
+
+
+TASKS.JSON
+
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+            "label": "watch",
+            "dependsOn": [
+                "npm: watch:tsc",
+                "npm: watch:esbuild"
+            ],
+            "presentation": {
+                "reveal": "never"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch:esbuild",
+            "group": "build",
+            "problemMatcher": "$esbuild-watch",
+            "isBackground": true,
+            "label": "npm: watch:esbuild",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+		{
+            "type": "npm",
+            "script": "watch:tsc",
+            "group": "build",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "label": "npm: watch:tsc",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+		{
+			"type": "npm",
+			"script": "watch-tests",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			},
+			"group": "build"
+		},
+		{
+			"label": "tasks: watch-tests",
+			"dependsOn": [
+				"npm: watch",
+				"npm: watch-tests"
+			],
+			"problemMatcher": []
+		}
+	]
+}
+
+
+
+LAUNCH.JSON
+
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "bashdb",
+			"request": "launch",
+			"name": "Bash-Debug (hardcoded script name)",
+			"cwd": "${workspaceFolder}",
+			"program": "${workspaceFolder}/path/to/script.sh",
+			"args": []
+		},
+		{
+			"name": "Run Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		}
+	]
+}
+
+
+
+EXTENSIONS.JSON
+
+{
+  "recommendations": ["dbaeumer.vscode-eslint", "connor4312.esbuild-problem-matchers", "ms-vscode.extension-test-runner"]
+}
+
+
+
+ESBUILD.JS
+
+const esbuild = require('esbuild');
+
+esbuild.build({
+    entryPoints: ['index.js'],
+    bundle: true,
+    outfile: 'out.js',
+}).catch(() => process.exit(1));
+
+
+
+INDEX.JS
+
+console.log('Hello, esbuild!');
+
+
+
+PACKAGE.JSON
+
+{
+  "name": "test-esbuild",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
+
+
+
+CHANGELOG.MD
+
+# Change Log
+
+All notable changes to the "con-svg-erter" extension will be documented in this file.
+
+Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+
+## [Unreleased]
+
+
+
+
+.VSCODEIGNORE
+
+.vscode/**
+.vscode-test/**
+out/**
+node_modules/**
+src/**
+.gitignore
+.yarnrc
+esbuild.js
+vsc-extension-quickstart.md
+**/tsconfig.json
+**/.eslintrc.json
+**/*.map
+**/*.ts
+**/.vscode-test.*
+
+
+
+.ESLINTRC.JSON
+
+{
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+        "ecmaVersion": 6,
+        "sourceType": "module"
+    },
+    "plugins": [
+        "@typescript-eslint"
+    ],
+    "rules": {
+        "@typescript-eslint/naming-convention": [
+            "warn",
+            {
+                "selector": "import",
+                "format": [ "camelCase", "PascalCase" ]
+            }
+        ],
+        "@typescript-eslint/semi": "warn",
+        "curly": "warn",
+        "eqeqeq": "warn",
+        "no-throw-literal": "warn",
+        "semi": "off"
+    },
+    "ignorePatterns": [
+        "out",
+        "dist",
+        "**/*.d.ts"
+    ]
+
+
+
+CON-SVG-ERTER.TXT
+
+ESBUILD.JS
+
+const esbuild = require('esbuild');
+const fs = require('fs');
+const path = require('path');
+
+// Log current working directory and the path to package.json
+console.log('Current working directory:', process.cwd());
+console.log('Checking package.json at path:', path.resolve(__dirname, './package.json'));
+
+// Directly read package.json to verify its content
+fs.readFile(path.resolve(__dirname, './package.json'), 'utf8', (err, data) => {
+    if (err) {
+        console.error('Error reading package.json:', err);
+        return;
+    }
+    console.log('package.json content:', data);
+
+    try {
+        const jsonContent = JSON.parse(data);
+        console.log('Parsed package.json content:', jsonContent);
+    } catch (parseErr) {
+        console.error('Error parsing package.json:', parseErr);
+        return;
+    }
+
+    // Proceed with esbuild if package.json is valid
+    runEsbuild();
+});
+
+function runEsbuild() {
+    const production = process.argv.includes('--production');
+    const watch = process.argv.includes('--watch');
+
+    const esbuildProblemMatcherPlugin = {
+        name: 'esbuild-problem-matcher',
+        setup(build) {
+            build.onStart(() => {
+                console.log('[watch] build started');
+            });
+            build.onEnd((result) => {
+                result.errors.forEach(({ text, location }) => {
+                    console.error(`✘ [ERROR] ${text}`);
+                    console.error(`    ${location.file}:${location.line}:${location.column}:`);
+                });
+                console.log('[watch] build finished');
+            });
+        },
+    };
+
+    async function main() {
+        try {
+            const ctx = await esbuild.context({
+                entryPoints: ['./src/test/index.js'],
+                bundle: true,
+                format: 'cjs',
+                minify: production,
+                sourcemap: !production,
+                sourcesContent: false,
+                platform: 'node',
+                outfile: 'out.js',
+                external: ['vscode'],
+                logLevel: 'silent',
+                plugins: [esbuildProblemMatcherPlugin],
+            });
+            if (watch) {
+                await ctx.watch();
+            } else {
+                await ctx.rebuild();
+                await ctx.dispose();
+            }
+        } catch (error) {
+            console.error('Build failed with error:', error);
+            process.exit(1);
+        }
+    }
+
+    main().catch((e) => {
+        console.error(e);
+        process.exit(1);
+    });
+
+
+
+VSC-EXTENSION-QUICKSTART.MD
+
+# Welcome to your VS Code Extension
+
+## What's in the folder
+
+* This folder contains all of the files necessary for your extension.
+* `package.json` - this is the manifest file in which you declare your extension and command.
+  * The sample plugin registers a command and defines its title and command name. With this information VS Code can show the command in the command palette. It doesn’t yet need to load the plugin.
+* `src/extension.ts` - this is the main file where you will provide the implementation of your command.
+  * The file exports one function, `activate`, which is called the very first time your extension is activated (in this case by executing the command). Inside the `activate` function we call `registerCommand`.
+  * We pass the function containing the implementation of the command as the second parameter to `registerCommand`.
+
+## Setup
+
+* install the recommended extensions (amodio.tsl-problem-matcher, ms-vscode.extension-test-runner, and dbaeumer.vscode-eslint)
+
+
+## Get up and running straight away
+
+* Press `F5` to open a new window with your extension loaded.
+* Run your command from the command palette by pressing (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac) and typing `Hello World`.
+* Set breakpoints in your code inside `src/extension.ts` to debug your extension.
+* Find output from your extension in the debug console.
+
+## Make changes
+
+* You can relaunch the extension from the debug toolbar after changing code in `src/extension.ts`.
+* You can also reload (`Ctrl+R` or `Cmd+R` on Mac) the VS Code window with your extension to load your changes.
+
+
+## Explore the API
+
+* You can open the full set of our API when you open the file `node_modules/@types/vscode/index.d.ts`.
+
+## Run tests
+
+* Install the [Extension Test Runner](https://marketplace.visualstudio.com/items?itemName=ms-vscode.extension-test-runner)
+* Run the "watch" task via the **Tasks: Run Task** command. Make sure this is running, or tests might not be discovered.
+* Open the Testing view from the activity bar and click the Run Test" button, or use the hotkey `Ctrl/Cmd + ; A`
+* See the output of the test result in the Test Results view.
+* Make changes to `src/test/extension.test.ts` or create new test files inside the `test` folder.
+  * The provided test runner will only consider files matching the name pattern `**.test.ts`.
+  * You can create folders inside the `test` folder to structure your tests any way you want.
+
+## Go further
+
+* Reduce the extension size and improve the startup time by [bundling your extension](https://code.visualstudio.com/api/working-with-extensions/bundling-extension).
+* [Publish your extension](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) on the VS Code extension marketplace.
+* Automate builds by setting up [Continuous Integration](https://code.visualstudio.com/api/working-with-extensions/continuous-integration).
+
+
+
+PACKAGE.JSON
+
+{
+    "name": "con-svg-erter",
+    "displayName": "Con(sVg)erter",
+    "description": "simple .jpeg/.jpg/.png/.webp to svg converter.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [{
+            "command": "extension.convertImage",
+            "title": "Convert Image to SVG"
+        }],
+        "menus": {
+            "explorer/context": [{
+                "command": "extension.convertImage",
+                "when": "resourceLangId == jpg || resourceLangId == jpeg || resourceLangId == png || resourceLangId == webp",
+                "group": "navigation"
+            }]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "npm run check-types && npm run lint && node esbuild.js",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "node esbuild.js --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "package": "npm run check-types && npm run lint && node esbuild.js --production",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
+        "check-types": "tsc --noEmit",
+        "lint": "eslint src --ext ts",
+        "test": "vscode-test"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.6",
+        "@types/node": "20.x",
+        "@types/vscode": "^1.90.0",
+        "@typescript-eslint/eslint-plugin": "^7.11.0",
+        "@typescript-eslint/parser": "^7.11.0",
+        "@vscode/test-cli": "^0.0.9",
+        "@vscode/test-electron": "^2.4.0",
+        "esbuild": "^0.21.5",
+        "eslint": "^8.57.0",
+        "npm-run-all": "^4.1.5",
+        "typescript": "^5.4.5"
+    }
+
+
+
+TSCONFIG.JSON
+
+{
+	"compilerOptions": {
+		 "module": "Node16",
+		 "target": "ES2022",
+		 "lib": [
+			  "ES2022"
+		 ],
+		 "sourceMap": true,
+		 "rootDir": "src",
+		 "strict": true
+	}
+
+
+
+.GITIGNORE
+
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+
+
+
+.VSCODE-TEST.MJS
+
+import { defineConfig } from '@vscode/test-cli';
+
+export default defineConfig({
+	files: 'out/test/**/*.test.js',
+});
+
+
+
+README.MD
+
+# con-svg-erter README
+
+This is the README for your extension "con-svg-erter". After writing up a brief description, we recommend including the following sections.
+
+## Features
+
+Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+
+For example if there is an image subfolder under your extension project workspace:
+
+\!\[feature X\]\(images/feature-x.png\)
+
+> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+
+## Requirements
+
+If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+
+## Extension Settings
+
+Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+
+For example:
+
+This extension contributes the following settings:
+
+* `myExtension.enable`: Enable/disable this extension.
+* `myExtension.thing`: Set to `blah` to do something.
+
+## Known Issues
+
+Calling out known issues can help limit users opening duplicate issues against your extension.
+
+## Release Notes
+
+Users appreciate release notes as you update your extension.
+
+### 1.0.0
+
+Initial release of ...
+
+### 1.0.1
+
+Fixed issue #.
+
+### 1.1.0
+
+Added features X, Y, and Z.
+
+---
+
+## Following extension guidelines
+
+Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+
+* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+
+## Working with Markdown
+
+You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+
+* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
+* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
+* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+
+## For more information
+
+* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
+* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+
+**Enjoy!**
+
+
+
+IMAGE_TO_SVG.SH
+
+#!/bin/bash
+
+# Use Zenity to create a file selection dialog
+input_file=$(zenity --file-selection --title="Select an image file" --file-filter="Images | *.jpeg *.jpg *.png *.webp")
+
+# Check if the user selected a file or canceled the dialog
+if [ -z "$input_file" ]; then
+  zenity --error --text="No file selected."
+  exit 1
+fi
+
+# Check if the input file exists
+if [ ! -f "$input_file" ]; then
+  zenity --error --text="File not found!"
+  exit 1
+fi
+
+# Get the directory and filename without extension
+input_dir=$(dirname "$input_file")
+filename=$(basename -- "$input_file")
+filename="${filename%.*}"
+
+# Output file path
+output_file="${input_dir}/${filename}.svg"
+
+# Convert the input image to PGM format using ImageMagick
+pgm_file="${input_dir}/${filename}.pgm"
+if ! convert "$input_file" "$pgm_file"; then
+  zenity --error --text="Failed to convert $input_file to PGM format."
+  exit 1
+fi
+
+# Convert the PGM file to SVG using Potrace
+if ! potrace -s -o "$output_file" "$pgm_file"; then
+  zenity --error --text="Failed to convert $pgm_file to SVG format."
+  # Ensure the PGM file is deleted even if Potrace fails
+  rm "$pgm_file"
+  exit 1
+fi
+
+# Remove the temporary PGM file
+rm "$pgm_file"
+
+# Notify the user of the successful conversion
+zenity --info --text="Conversion complete: $output_file"
+
+
+
+INDEX.JS
+
+
+
+
+EXTENSION.TEST.TS
+
+import * as assert from 'assert';
+import * as vscode from 'vscode';
+// import * as myExtension from '../../extension';
+
+suite('Extension Test Suite', () => {
+	vscode.window.showInformationMessage('Start all tests.');
+
+	test('Sample test', () => {
+		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
+		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	});
+});
+
+
+
+EXTENSION.TS
+
+import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export function activate(context: vscode.ExtensionContext) {
+  let disposable = vscode.commands.registerCommand('extension.convertImage', async (uri: vscode.Uri) => {
+    if (!uri || !uri.fsPath) {
+      vscode.window.showErrorMessage('No image file selected.');
+      return;
+    }
+
+    const inputFile = uri.fsPath;
+
+    try {
+      const scriptPath = vscode.Uri.file('/home/rr-h/Documents/Scripts/image_to_svg.sh').fsPath;
+      const { stdout, stderr } = await execAsync(`bash "${scriptPath}" "${inputFile}"`);
+      if (stderr) {
+        throw new Error(stderr);
+      }
+
+      vscode.window.showInformationMessage(`Conversion complete: ${stdout.trim()}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        vscode.window.showErrorMessage(`Conversion failed: ${error.message}`);
+      } else {
+        vscode.window.showErrorMessage('Conversion failed: An unknown error occurred.');
+      }
+    }
+  });
+
+  context.subscriptions.push(disposable);
+}
+
+export function deactivate() {}
+
+
+
+SETTINGS.JSON
+
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        ".DS_Store": true,
+        ".env": true,
+        "*.xcodeproj/": true,
+        "*venv*": true,
+        "/.venv": true,
+        "/node_modules": true,
+        "node_modules": true,
+        "out": false,
+        "dist": false,
+        "**/node_modules": true
+    },
+    "search.exclude": {
+        "out": true,
+        "dist": false
+    },
+    "workbench.colorCustomizations": {
+        "activityBar.border": "#FA9E9E",
+        "tab.activeBorderTop": "#FA9E9E"
+    }
+
+
+
+TASKS.JSON
+
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+            "label": "watch",
+            "dependsOn": [
+                "npm: watch:tsc",
+                "npm: watch:esbuild"
+            ],
+            "presentation": {
+                "reveal": "never"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch:esbuild",
+            "group": "build",
+            "problemMatcher": "$esbuild-watch",
+            "isBackground": true,
+            "label": "npm: watch:esbuild",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+		{
+            "type": "npm",
+            "script": "watch:tsc",
+            "group": "build",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "label": "npm: watch:tsc",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+		{
+			"type": "npm",
+			"script": "watch-tests",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			},
+			"group": "build"
+		},
+		{
+			"label": "tasks: watch-tests",
+			"dependsOn": [
+				"npm: watch",
+				"npm: watch-tests"
+			],
+			"problemMatcher": []
+		}
+	]
+}
+
+
+
+LAUNCH.JSON
+
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "bashdb",
+			"request": "launch",
+			"name": "Bash-Debug (hardcoded script name)",
+			"cwd": "${workspaceFolder}",
+			"program": "${workspaceFolder}/path/to/script.sh",
+			"args": []
+		},
+		{
+			"name": "Run Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		}
+	]
+}
+
+
+
+EXTENSIONS.JSON
+
+{
+  "recommendations": ["dbaeumer.vscode-eslint", "connor4312.esbuild-problem-matchers", "ms-vscode.extension-test-runner"]
+}
+
+
+
+ESBUILD.JS
+
+const esbuild = require('esbuild');
+
+esbuild.build({
+    entryPoints: ['index.js'],
+    bundle: true,
+    outfile: 'out.js',
+}).catch(() => process.exit(1));
+
+
+
+INDEX.JS
+
+console.log('Hello, esbuild!');
+
+
+
+PACKAGE.JSON
+
+{
+  "name": "test-esbuild",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
+
+
+
+CHANGELOG.MD
+
+# Change Log
+
+All notable changes to the "con-svg-erter" extension will be documented in this file.
+
+Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+
+## [Unreleased]
+
+
+
+
+.VSCODEIGNORE
+
+.vscode/**
+.vscode-test/**
+out/**
+node_modules/**
+src/**
+.gitignore
+.yarnrc
+esbuild.js
+vsc-extension-quickstart.md
+**/tsconfig.json
+**/.eslintrc.json
+**/*.map
+**/*.ts
+**/.vscode-test.*
+
+
+
+.ESLINTRC.JSON
+
+{
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+        "ecmaVersion": 6,
+        "sourceType": "module"
+    },
+    "plugins": [
+        "@typescript-eslint"
+    ],
+    "rules": {
+        "@typescript-eslint/naming-convention": [
+            "warn",
+            {
+                "selector": "import",
+                "format": [ "camelCase", "PascalCase" ]
+            }
+        ],
+        "@typescript-eslint/semi": "warn",
+        "curly": "warn",
+        "eqeqeq": "warn",
+        "no-throw-literal": "warn",
+        "semi": "off"
+    },
+    "ignorePatterns": [
+        "out",
+        "dist",
+        "**/*.d.ts"
+    ]
+
+
+
+
+
+
