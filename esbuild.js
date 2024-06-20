@@ -7,7 +7,7 @@ console.log('Current working directory:', process.cwd());
 console.log('Checking package.json at path:', path.resolve(__dirname, '../../../package.json'));
 
 // Directly read package.json to verify its content
-fs.readFile(path.resolve(__dirname, '../../../package.json'), 'utf8', (err, data) => {
+fs.readFile(path.resolve(__dirname, './package.json'), 'utf8', (err, data) => {
     if (err) {
         console.error('Error reading package.json:', err);
         return;
