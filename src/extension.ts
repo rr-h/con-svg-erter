@@ -1,26 +1,36 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const execAsync = promisify(exec);
+
 export function activate(context: vscode.ExtensionContext) {
+  let disposable = vscode.commands.registerCommand('extension.convertImage', async (uri: vscode.Uri) => {
+    if (!uri || !uri.fsPath) {
+      vscode.window.showErrorMessage('No image file selected.');
+      return;
+    }
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "con-svg-erter" is now active!');
+    const inputFile = uri.fsPath;
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('con-svg-erter.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from Con(SVG)erter!');
-	});
+    try {
+      const scriptPath = vscode.Uri.file('/home/rr-h/Documents/Scripts/image_to_svg.sh').fsPath;
+      const { stdout, stderr } = await execAsync(`bash "${scriptPath}" "${inputFile}"`);
+      if (stderr) {
+        throw new Error(stderr);
+      }
 
-	context.subscriptions.push(disposable);
+      vscode.window.showInformationMessage(`Conversion complete: ${stdout.trim()}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        vscode.window.showErrorMessage(`Conversion failed: ${error.message}`);
+      } else {
+        vscode.window.showErrorMessage('Conversion failed: An unknown error occurred.');
+      }
+    }
+  });
+
+  context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
