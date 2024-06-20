@@ -4,7 +4,7 @@ const path = require('path');
 
 // Log current working directory and the path to package.json
 console.log('Current working directory:', process.cwd());
-console.log('Checking package.json at path:', path.resolve(__dirname, '../../../package.json'));
+console.log('Checking package.json at path:', path.resolve(__dirname, './package.json'));
 
 // Directly read package.json to verify its content
 fs.readFile(path.resolve(__dirname, './package.json'), 'utf8', (err, data) => {
@@ -49,7 +49,7 @@ function runEsbuild() {
     async function main() {
         try {
             const ctx = await esbuild.context({
-                entryPoints: ['index.js'],
+                entryPoints: ['./src/test/index.js'],
                 bundle: true,
                 format: 'cjs',
                 minify: production,
